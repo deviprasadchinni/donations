@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donations List</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 p-6 sm:p-8">
+        <!-- Header Section -->
+        <div class="mb-6 text-center sm:text-left">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Donations Tracker</h1>
+            <p class="text-gray-500 mt-1">Real-time tracker powered by Google Sheets</p>
+        </div>
+
+        <!-- Search Box -->
+        <div class="relative mb-6">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search by name or location..." class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-gray-50 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base transition">
+        </div>
+
+        <!-- Table Container for Horizontal Scrolling on Mobile -->
+        <div class="overflow-x-auto rounded-lg border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-left text-sm" id="donationTable">
+                <thead class="bg-gray-100 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <tr>
+                        <th scope="col" class="px-6 py-4">Name</th>
+                        <th scope="col" class="px-6 py-4">Location</th>
+                        <th scope="col" class="px-6 py-4 text-right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white" id="tableBody">
+                    <!-- Loading State -->
+                    <tr id="loadingRow">
+                        <td colspan="3" class="px-6 py-10 text-center text-gray-500 font-medium">
+                            <svg class="animate-spin h-5 w-5 mx-auto mb-2 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Loading donation data...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // REPLACE THIS URL with your actual Google Sheets published CSV URL
+        const csvUrl = 'YOUR_GOOGLE_SHEETS_PUBLISHED_CSV_URL_HERE';
+
+        async function fetchDonations() {
+            try {
+                const response = await fetch(csvUrl);
+                const data = await response.text();
+                
+                // Parse CSV rows cleanly
+                const rows = data.split('\n').map(row => {
+                    // Match commas but ignore commas inside quotes
+                    return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim());
+                });
+
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = ''; // Clear loading row
+
+                // Skip header row (index 0) and loop through data
+                for (let i = 1; i < rows.length; i++) {
+                    if (rows[i].length < 3 || !rows[i][0]) continue; // Skip empty rows
+
+                    const name = rows[i][0];
+                    const location = rows[i][1];
+                    const amount = rows[i][2];
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 transition';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-semibold text-gray-900">${name}</td>
+                        <td class="px-6 py-4 text-gray-600">${location}</td>
+                        <td class="px-6 py-4 text-right font-mono font-bold text-green-600">${amount}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                }
+            } catch (error) {
+                console.error('Error fetching sheet data:', error);
+                document.getElementById('tableBody').innerHTML = `
+                    <tr>
+                        <td colspan="3" class="px-6 py-10 text-center text-red-500 font-medium">
+                            Failed to load donation data. Please check your CSV URL.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function filterTable() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('donationTable');
+            const tr = table.getElementsByTagName('tr');
+
+            // Loop through all table rows (skipping header row)
+            for (let i = 1; i < tr.length; i++) {
+                // Ignore the loading or error rows if present
+                if (tr[i].id === 'loadingRow') continue;
+
+                const tdName = tr[i].getElementsByTagName('td')[0];
+                const tdLocation = tr[i].getElementsByTagName('td')[1];
+                
+                if (tdName || tdLocation) {
+                    const nameText = tdName.textContent || tdName.innerText;
+                    const locationText = tdLocation.textContent || tdLocation.innerText;
+                    
+                    if (nameText.toLowerCase().indexOf(filter) > -1 || locationText.toLowerCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
+        // Run on page load
+        if(csvUrl.includes('YOUR_GOOGLE_SHEETS')) {
+            // Placeholder template demo data if they haven't replaced the URL yet
+            setTimeout(() => {
+                const demoData = [
+                    ["Jane Doe", "New York, USA", "$150.00"],
+                    ["John Smith", "London, UK", "£50.00"],
+                    ["Ali Mansoor", "Dubai, UAE", "500 AED"],
+                    ["Marie Curie", "Paris, France", "€200.00"]
+                ];
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = '';
+                demoData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 transition';
+                    tr.innerHTML = `<td class="px-6 py-4 font-semibold text-gray-900">${row[0]}</td><td class="px-6 py-4 text-gray-600">${row[1]}</td><td class="px-6 py-4 text-right font-mono font-bold text-green-600">${row[2]}</td>`;
+                    tableBody.appendChild(tr);
+                });
+            }, 1000);
+        } else {
+            fetchDonations();
+        }
+    </script>
+</body>
+</html>
